@@ -4,11 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requireActive?: boolean;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireActive = false }) => {
-  const { token, status, isLoading } = useAuth();
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { token, isLoading } = useAuth();
 
   if (isLoading) {
     return <div>Loading...</div>;
@@ -16,10 +15,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
 
   if (!token) {
     return <Navigate to="/shop/dashboard/login" />;
-  }
-
-  if (requireActive && status !== 'active') {
-    return <Navigate to="/shop/dashboard/profile" />;
   }
 
   return <>{children}</>;

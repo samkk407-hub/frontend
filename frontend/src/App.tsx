@@ -6,15 +6,17 @@ import ShopRegister  from "./pages/ShopRegister";
 import ShopDashboard from "./pages/ShopDashboard";
 import ShopLogin from "./pages/ShopLogin";
 import Profile from "./pages/Profile";
+import CustomerUploadPage from "./pages/CustomerUploadPage";
 export function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/shop/:shopId" element={<CustomerUploadPage />} />
           <Route path="/shop/dashboard/login" element={<ShopLogin />} />
           <Route path="/shop/dashboard/register" element={<ShopRegister />} />
           <Route path="/shop/dashboard" element={
-            <ProtectedRoute requireActive>
+            <ProtectedRoute>
               <ShopDashboard />
             </ProtectedRoute>
           } />
