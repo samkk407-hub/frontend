@@ -13,6 +13,7 @@ const orderSchema = new mongoose.Schema({
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true },
   documentUrl: { type: String },
+  documentPublicId: { type: String },
   pages: { type: Number, required: true, min: 1 },
   printType: {
     type: String,
@@ -28,11 +29,6 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ["cash"],
     default: "cash"
-  },
-  status: {
-    type: String,
-    enum: ["pending_mobile_verification", "mobile_verified", "confirmed", "printing", "done"],
-    default: "pending_mobile_verification"
   },
   mobileOtp: { type: String },
   printReleaseOtp: { type: String },

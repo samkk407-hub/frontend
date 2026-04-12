@@ -2,9 +2,11 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Shop = require("../models/Shop");
 
+// Generate a 4-digit OTP for mobile verification or print release.
 const generateOtp = () => Math.floor(1000 + Math.random() * 9000).toString();
 
-exports.createNewOrder = async ({ shopId, customerName, customerPhone, pages, printType, colorMode, paymentMethod }) => {
+// Create a new order and store the uploaded document path.
+exports.createNewOrder = async ({ shopId, customerName, customerPhone, pages, printType, colorMode, paymentMethod, documentUrl, documentPublicId }) => {
   if (!shopId || !customerName || !customerPhone || !pages) {
     throw new Error("shopId, customerName, customerPhone and pages are required");
   }
@@ -14,7 +16,7 @@ exports.createNewOrder = async ({ shopId, customerName, customerPhone, pages, pr
     throw new Error("Shop not found");
   }
 
-  const mobileOtp = "0000"; // Default OTP for now
+  const mobileOtp = generateOtp();
 
   return await Order.create({
     shopId,
@@ -24,69 +26,46 @@ exports.createNewOrder = async ({ shopId, customerName, customerPhone, pages, pr
     printType: printType || "portrait",
     colorMode: colorMode || "bw",
     paymentMethod: paymentMethod || "cash",
-    mobileOtp
+    documentUrl,
+    documentPublicId,
+    mobileOtp,
   });
 };
 
-exports.fetchShopOrders = async (shopId) => {
-  return await Order.find({ shopId })
-    .select("status printType colorMode createdAt")
-    .sort({ createdAt: -1 });
-};
-
-exports.fetchShopOrderCounts = async (shopId) => {
-  const objectId = mongoose.Types.ObjectId.isValid(shopId) ? mongoose.Types.ObjectId(shopId) : shopId;
-  const counts = await Order.aggregate([
-    { $match: { shopId: objectId } },
-    {
-      $group: {
-        _id: "$status",
-        count: { $sum: 1 }
-      }
-    }
-  ]);
-
-  const stats = {
-    totalOrders: 0,
-    pendingMobileVerification: 0,
-    mobileVerified: 0,
-    confirmedOrders: 0,
-    printingOrders: 0,
-    doneOrders: 0
-  };
-
-  counts.forEach((item) => {
-    stats.totalOrders += item.count;
-    if (item._id === "pending_mobile_verification") stats.pendingMobileVerification = item.count;
-    if (item._id === "mobile_verified") stats.mobileVerified = item.count;
-    if (item._id === "confirmed") stats.confirmedOrders = item.count;
-    if (item._id === "printing") stats.printingOrders = item.count;
-    if (item._id === "done") stats.doneOrders = item.count;
-  });
-
-  return stats;
-};
-
+// Verify the customer mobile OTP and generate a print release OTP for the shop.
+// The same printReleaseOtp can be reused later.
 exports.verifyMobileOtp = async (orderId, otp) => {
   const order = await Order.findById(orderId);
-  if (!order || order.mobileOtp !== otp || order.status !== "pending_mobile_verification") {
+  if (!order || order.mobileOtp !== otp) {
     return null;
   }
 
-  order.status = "mobile_verified";
-  const printReleaseOtp = generateOtp();
-  order.printReleaseOtp = printReleaseOtp;
-  await order.save();
-  return { order, printReleaseOtp };
+  if (!order.printReleaseOtp) {
+    order.printReleaseOtp = generateOtp();
+    await order.save();
+  }
+
+  return { order, printReleaseOtp: order.printReleaseOtp };
 };
 
+// Verify the print-release OTP from shop side.
+// No 24-hour expiration. Order remains saved.
 exports.verifyPrintReleaseOtp = async (shopId, otp) => {
-  const order = await Order.findOne({ shopId, printReleaseOtp: otp, status: "mobile_verified" });
+  const order = await Order.findOne({ shopId, printReleaseOtp: otp });
   if (!order) {
     return null;
   }
 
-  order.status = "confirmed";
-  await order.save();
+  return order;
+};
+
+// Mark the order as printed when the shop presses the print button.
+// This does not delete or change order data.
+exports.markOrderPrinted = async (orderId, shopId) => {
+  const order = await Order.findOne({ _id: orderId, shopId, printReleaseOtp: { $exists: true, $ne: null } });
+  if (!order) {
+    return null;
+  }
+
   return order;
 };
